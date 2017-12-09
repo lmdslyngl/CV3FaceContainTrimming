@@ -183,8 +183,12 @@ void CalcTrimRegion(
 
 int main(int argc, char *argv[]) {
     
+    std::string myPath = GetMyDir();
+    std::string myDir = myPath.substr(0, myPath.rfind('\\'));
+    std::string defaultCascadePath = myDir + "\\lbpcascade_animeface.xml";
+    
     CmdParser parser;
-    parser.Add("cascade-xml", 'x', "OpenCV cascade xml file", true, "lbpcascade_animeface.xml");
+    parser.Add("cascade-xml", 'x', "OpenCV cascade xml file", true, defaultCascadePath);
     parser.Add("cascade-scale-factor", 's', "Cascade scale factor", true, "1.01");
     parser.Add("cascade-neighbor", 'n', "Cascade num neighbors", true, "3");
     parser.Add("cascade-min-ratio", 'm', "Cascade min size ratio", true, "0.05");
