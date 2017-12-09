@@ -31,7 +31,7 @@ template <class InputIterator> void NormalizeList(
     auto maxValue = *minmax.second;
     std::for_each(first, last,
         [minValue, maxValue](auto &v) {
-        v = Normalize(v, minValue, maxValue);
-    });
+            v = Normalize(v, minValue, maxValue);
+        });
 }
 

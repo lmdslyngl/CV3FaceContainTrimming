@@ -4,10 +4,10 @@
 #include <vector>
 
 #include <opencv2/opencv.hpp>
-#include <opencv2/saliency.hpp>
 
 #include "Util.h"
 #include "cvlib.h"
+#include "cmdparser.h"
 
 
 // 指定された領域内に含まれる顔領域の面積を計算
@@ -132,50 +132,114 @@ cv::Rect SearchMaxFaceAreaTrimmingRegion(
     
 }
 
-int main(int argc, char *argv[]) {
+// 画像から切り抜き領域を計算する
+void CalcTrimRegion(
+    cv::Rect *pOutRegion,
+    std::vector<cv::Rect> *pOutFaceRegionsList,
+    std::vector<double> *pOutLevelWeightList,
+    const cv::Mat &image,
+    cv::CascadeClassifier &classifier,
+    double cascadeScaleFactor=1.1,
+    int cascadeNumNeighbor=3,
+    double minSizeRatio=0.0)
+{
     
-    if( argc < 2 ) {
-        std::cerr << "Too less arguments!";
-        std::cerr << "Usage: cv3facecontaintrimming <image>";
-        return 1;
-    }
-    
-    std::string inImage = argv[1];
-    cv::Mat img = cv::imread(inImage);
-    
-    cv::Mat imgDetect = img.clone();
+    cv::Mat imgDetect = image.clone();
     cv::cvtColor(imgDetect, imgDetect, cv::COLOR_BGR2GRAY);
     cv::equalizeHist(imgDetect, imgDetect);
     
-    int width = img.cols;
-    int height = img.rows;
+    int width = image.cols;
+    int height = image.rows;
     int shorter = std::min(width, height);
     
+    cv::Size minSize;
+    if( 0.0 < minSizeRatio ) {
+        // minSizeRatioが0.0より大きかった場合は，
+        // 最小領域制限を行う
+        minSize.width = (int)(shorter * minSizeRatio);
+        minSize.height = (int)(shorter * minSizeRatio);
+    }
+    
     // 顔検出
-    cv::CascadeClassifier classifier("lbpcascade_animeface.xml");
-    std::vector<cv::Rect> vecFaceList;
+    std::vector<cv::Rect> faceList;
     std::vector<int> rejectLevelList;
     std::vector<double> levelWeightList;
     classifier.detectMultiScale(
-        imgDetect, vecFaceList,
+        imgDetect, faceList,
         rejectLevelList, levelWeightList,
-        1.01, 3, 0, cv::Size(shorter / 20, shorter / 20), cv::Size(), true);
+        cascadeScaleFactor, cascadeNumNeighbor, 0,
+        minSize, cv::Size(), true);
+    
     NormalizeList(std::begin(levelWeightList), std::end(levelWeightList));
     
-    for( size_t i = 0; i < vecFaceList.size(); i++ ) {
-        const cv::Rect &rgn = vecFaceList[i];
-        double weight = levelWeightList[i];
-        cv::rectangle(img, rgn, cv::Scalar(255 * weight, 0, 0), 2);
+    // 切り抜き領域探索
+    cv::Rect trimRgn = SearchMaxFaceAreaTrimmingRegion(faceList, width, height);
+    
+    if( pOutRegion ) *pOutRegion = trimRgn;
+    if( pOutFaceRegionsList ) *pOutFaceRegionsList = faceList;
+    if( pOutLevelWeightList ) *pOutLevelWeightList = levelWeightList;
+    
+}
+
+int main(int argc, char *argv[]) {
+    
+    CmdParser parser;
+    parser.Add("cascade-xml", 'x', "OpenCV cascade xml file", true, "lbpcascade_animeface.xml");
+    parser.Add("cascade-scale-factor", 's', "Cascade scale factor", true, "1.01");
+    parser.Add("cascade-neighbor", 'n', "Cascade num neighbors", true, "3");
+    parser.Add("cascade-min-ratio", 'm', "Cascade min size ratio", true, "0.05");
+    parser.Add("input", 'i', "Input image", true);
+    parser.Add("output", 'o', "Output trimmed image", true);
+    parser.Add("help", 'h', "Show this help", false);
+    parser.Parse(argc, argv);
+    
+    if( parser.Get<bool>("help") ) {
+        std::cout << parser.GetHelp() << std::endl;
+        return 0;
     }
     
-    // 切り抜き領域探索
-    cv::Rect trimRgn = SearchMaxFaceAreaTrimmingRegion(vecFaceList, width, height);
-    cv::rectangle(img, trimRgn, cv::Scalar(0, 0, 255), 4);
+    std::string inImage = parser.Get<std::string>("input");
+    std::string outImage = parser.Get<std::string>("output");
     
-    cv::resize(img, img, cv::Size(img.cols / 2, img.rows / 2));
+    if( inImage.empty() || outImage.empty() ) {
+        std::cerr << "--input and --output are must be specified!";
+        return 1;
+    }
     
-    cv::imshow("img", img);
-    cv::waitKey();
+    cv::Mat img = cv::imread(inImage);
+    
+    cv::CascadeClassifier classifier(
+        parser.Get<std::string>("cascade-xml"));
+    
+    // 切り抜き領域計算
+    cv::Rect trimRegion;
+    std::vector<cv::Rect> vecFaceList;
+    std::vector<double> levelWeightList;
+    CalcTrimRegion(
+        &trimRegion, &vecFaceList, &levelWeightList,
+        img, classifier,
+        parser.Get<double>("cascade-scale-factor"),
+        parser.Get<int>("cascade-neighbor"),
+        parser.Get<double>("cascade-min-ratio"));
+    
+    if( outImage == "#" ) {
+        // ウィンドウに出力
+        for( size_t i = 0; i < vecFaceList.size(); i++ ) {
+            const cv::Rect &rgn = vecFaceList[i];
+            double weight = levelWeightList[i];
+            cv::rectangle(img, rgn, cv::Scalar(255 * weight, 0, 0), 2);
+        }
+        cv::rectangle(img, trimRegion, cv::Scalar(0, 0, 255), 4);
+        cv::resize(img, img, cv::Size(img.cols / 2, img.rows / 2));
+        
+        cv::imshow("img", img);
+        cv::waitKey();
+        
+    } else {
+        // ファイルに出力
+        cv::Mat trimmedImage(img, trimRegion);
+        cv::imwrite(outImage, trimmedImage);
+    }
     
     return 0;
     

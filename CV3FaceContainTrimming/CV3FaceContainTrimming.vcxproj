@@ -132,6 +132,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cmdparser.h" />
     <ClInclude Include="cvlib.h" />
     <ClInclude Include="Util.h">
       <SubType>
