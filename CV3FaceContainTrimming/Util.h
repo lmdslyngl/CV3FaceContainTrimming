@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <algorithm>
+#include <string>
 
 // 最小値と最大値を指定して正規化
 template <class T> T Normalize(T value, T minValue, T maxValue) {
@@ -34,4 +35,7 @@ template <class InputIterator> void NormalizeList(
             v = Normalize(v, minValue, maxValue);
         });
 }
+
+// 自分のディレクトリを取得する
+std::string GetMyDir();
 
