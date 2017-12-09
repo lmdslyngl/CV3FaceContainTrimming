@@ -144,13 +144,19 @@ void CalcTrimRegion(
     double minSizeRatio=0.0)
 {
     
-    cv::Mat imgDetect = image.clone();
-    cv::cvtColor(imgDetect, imgDetect, cv::COLOR_BGR2GRAY);
-    cv::equalizeHist(imgDetect, imgDetect);
-    
     int width = image.cols;
     int height = image.rows;
     int shorter = std::min(width, height);
+    
+    if( width == height ) {
+        // 既に正方形の場合は何もしない
+        if( pOutRegion ) *pOutRegion = cv::Rect(0, 0, width, height);
+        return;
+    }
+    
+    cv::Mat imgDetect = image.clone();
+    cv::cvtColor(imgDetect, imgDetect, cv::COLOR_BGR2GRAY);
+    cv::equalizeHist(imgDetect, imgDetect);
     
     cv::Size minSize;
     if( 0.0 < minSizeRatio ) {
