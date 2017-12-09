@@ -16,8 +16,8 @@ template <class T> T Clamp(T value, T minValue, T maxValue) {
 template <class T> T RangedClamp(T start, T length, T minValue, T maxValue) {
     if( start < 0 ) {
         start = 0;
-    } else if( maxValue <= start + length ) {
-        start = maxValue - length;
+    } else if( maxValue <= start + (length - 1) ) {
+        start = maxValue - (length - 1);
     }
     return start;
 }
